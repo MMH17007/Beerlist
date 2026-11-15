@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 const env = import.meta.env;
 
@@ -19,6 +20,7 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 
 // Caché local: la app abre al instante con los últimos datos y funciona con mala cobertura.
 export const db = initializeFirestore(app, {

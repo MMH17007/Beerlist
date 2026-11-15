@@ -1,8 +1,12 @@
-// Comprime la foto en el navegador y la sube a ImgBB.
-// Una foto de móvil pasa de ~5 MB a ~300 KB: sube mucho más rápido con datos.
+// Fotos en Firebase Storage. No hay ninguna llave en la web: las reglas de storage.rules
+// solo dejan subir a usuarios con el correo confirmado, imágenes de menos de 2 MB y en su carpeta.
+
+import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { storage } from './firebase.js';
 
 const MAX_SIDE = 1600;
 const QUALITY = 0.82;
+export const MAX_BYTES = 2 * 1024 * 1024;
 
 export async function compressImage(file) {
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -17,25 +21,29 @@ export async function compressImage(file) {
   );
 }
 
-export async function uploadImage(file) {
-  const key = import.meta.env.VITE_IMGBB_API_KEY;
-  if (!key) throw new Error('Falta VITE_IMGBB_API_KEY en el archivo .env');
-
-  let body = file;
+/** Sube la foto y devuelve { imageUrl, imagePath }. */
+export async function uploadImage(file, uid) {
+  let blob;
   try {
-    body = await compressImage(file);
+    blob = await compressImage(file);
   } catch {
-    // Formatos que el navegador no sabe dibujar (p. ej. HEIC en escritorio): se sube el original.
+    throw new Error('Ese formato de foto no se puede usar. Prueba con una JPG o PNG.');
   }
+  if (blob.size > MAX_BYTES) throw new Error('La foto es demasiado grande incluso comprimida. Prueba con otra.');
 
-  const form = new FormData();
-  form.append('image', body, 'cerveza.jpg');
+  const imagePath = `beers/${uid}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.jpg`;
+  const fileRef = ref(storage, imagePath);
+  try {
+    await uploadBytes(fileRef, blob, { contentType: 'image/jpeg', cacheControl: 'public, max-age=31536000' });
+  } catch (error) {
+    if (error?.code === 'storage/unauthorized') throw new Error('Confirma tu correo para poder subir fotos.');
+    throw new Error('No se ha podido subir la foto. Inténtalo de nuevo.');
+  }
+  return { imageUrl: await getDownloadURL(fileRef), imagePath };
+}
 
-  const response = await fetch(`https://api.imgbb.com/1/upload?key=${encodeURIComponent(key)}`, {
-    method: 'POST',
-    body: form,
-  });
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.success) throw new Error('No se ha podido subir la foto. Inténtalo de nuevo.');
-  return data.data.display_url || data.data.url;
+/** Borra la foto de una publicación (las antiguas de ImgBB no tienen imagePath y se ignoran). */
+export async function deleteImage(imagePath) {
+  if (!imagePath) return;
+  await deleteObject(ref(storage, imagePath)).catch(() => {});
 }

@@ -48,6 +48,18 @@
               </button>
             </div>
           </div>
+          <fieldset data-field="consent" class="space-y-3 rounded-xl bg-gray-50 p-3" hidden>
+            <legend class="sr-only">Requisitos para crear la cuenta</legend>
+            <label class="flex items-start gap-3 text-sm text-gray-700">
+              <input id="auth-adult" type="checkbox" class="mt-0.5 h-5 w-5 shrink-0 accent-mustard-dark">
+              <span>Tengo 18 años o más.</span>
+            </label>
+            <label class="flex items-start gap-3 text-sm text-gray-700">
+              <input id="auth-terms" type="checkbox" class="mt-0.5 h-5 w-5 shrink-0 accent-mustard-dark">
+              <span>He leído y acepto las <a href="/aviso-legal.html" target="_blank" class="link">condiciones de uso</a> y la <a href="/privacidad.html" target="_blank" class="link">política de privacidad</a>.</span>
+            </label>
+          </fieldset>
+
           <p id="auth-error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert" hidden></p>
 
           <button type="submit" id="auth-submit" class="btn-primary w-full">Entrar</button>
@@ -58,6 +70,10 @@
           <button type="button" id="auth-switch-account" class="link" hidden>Usar otra cuenta</button>
         </div>
       </div>
+      <p class="mt-6 text-center text-xs text-gray-500">
+        Solo para mayores de 18 años. Bebe con moderación.<br>
+        <a href="/aviso-legal.html" class="underline">Aviso legal</a> · <a href="/privacidad.html" class="underline">Privacidad</a>
+      </p>
     </div>
   </section>
 
@@ -73,28 +89,43 @@
           <a href="#inicio" data-nav="inicio" class="nav-desk"><i class="fa-solid fa-house w-5" aria-hidden="true"></i><span>Todas las cervezas</span></a>
           <a href="#bodega" data-nav="bodega" class="nav-desk"><i class="fa-solid fa-bottle-water w-5" aria-hidden="true"></i><span>Mi bodega</span></a>
           <a href="#bar" data-nav="bar" class="nav-desk"><i class="fa-solid fa-people-group w-5" aria-hidden="true"></i><span>El bar</span></a>
+          <a href="#moderar" data-nav="moderar" class="nav-desk" data-admin-only hidden><i class="fa-solid fa-shield-halved w-5" aria-hidden="true"></i><span>Moderar</span><span class="ml-auto rounded-full bg-red-600 px-2 text-xs font-bold text-white" data-report-count hidden></span></a>
         </nav>
       </div>
       <div class="space-y-3">
         <button type="button" data-action="add-beer" class="btn-primary w-full"><i class="fa-solid fa-plus" aria-hidden="true"></i> Añadir cerveza</button>
-        <div class="flex items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2">
-          <span class="truncate text-sm font-semibold" data-user-name></span>
-          <button type="button" data-action="logout" class="icon-btn" aria-label="Cerrar sesión" title="Cerrar sesión">
-            <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
-          </button>
-        </div>
+        <button type="button" data-action="account" class="flex w-full items-center gap-3 rounded-xl bg-gray-50 px-3 py-2 text-left transition hover:bg-gray-100">
+          <i class="fa-solid fa-circle-user text-2xl text-gray-400" aria-hidden="true"></i>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-sm font-semibold" data-user-name></span>
+            <span class="block text-xs text-gray-500">Mi cuenta</span>
+          </span>
+        </button>
       </div>
     </aside>
 
     <!-- Cabecera (móvil) -->
     <header class="sticky top-0 z-20 flex items-center justify-between border-b border-gray-100 bg-white/90 px-4 py-3 backdrop-blur md:hidden">
       <p class="logo text-2xl">beerlist<span>.</span></p>
-      <button type="button" data-action="logout" class="icon-btn" aria-label="Cerrar sesión">
-        <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+      <button type="button" data-action="account" class="icon-btn" aria-label="Mi cuenta">
+        <i class="fa-solid fa-circle-user text-2xl" aria-hidden="true"></i>
       </button>
     </header>
 
     <main id="main" class="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-32 md:px-8 md:pb-10">
+
+      <!-- Aviso: correo sin verificar -->
+      <div id="verify-banner" class="mb-6 flex flex-col gap-3 rounded-2xl border border-mustard bg-mustard-50 p-4 sm:flex-row sm:items-center" role="status" hidden>
+        <i class="fa-solid fa-envelope-circle-check text-2xl text-mustard-ink" aria-hidden="true"></i>
+        <p class="flex-1 text-sm text-gray-800">
+          <strong>Confirma tu correo para publicar.</strong>
+          Te hemos enviado un enlace a <span data-user-email class="font-semibold"></span>. Mientras tanto puedes mirar todo lo que quieras.
+        </p>
+        <div class="flex gap-2">
+          <button type="button" id="verify-resend" class="btn-secondary min-h-10 px-3 text-sm">Reenviar</button>
+          <button type="button" id="verify-check" class="btn-primary min-h-10 px-3 text-sm">Ya lo he confirmado</button>
+        </div>
+      </div>
 
       <!-- VISTA: TODAS LAS CERVEZAS -->
       <section id="view-inicio" data-view="inicio" aria-labelledby="h-inicio">
@@ -144,6 +175,15 @@
         </div>
         <div id="bar-grid" class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"></div>
       </section>
+
+      <!-- VISTA: MODERACIÓN (solo administradores) -->
+      <section id="view-moderar" data-view="moderar" aria-labelledby="h-moderar" hidden>
+        <div class="mb-5">
+          <h1 id="h-moderar" class="view-title">Moderar</h1>
+          <p class="view-subtitle">Denuncias pendientes. Revisa el contenido y decide si se borra o se queda.</p>
+        </div>
+        <ul id="reports-list" class="space-y-3"></ul>
+      </section>
     </main>
 
     <!-- Botón flotante (móvil) -->
@@ -152,10 +192,11 @@
     </button>
 
     <!-- Navegación inferior (móvil) con etiquetas -->
-    <nav class="fixed inset-x-0 bottom-0 z-20 grid grid-cols-3 border-t border-gray-100 bg-white pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Secciones">
+    <nav class="fixed inset-x-0 bottom-0 z-20 grid auto-cols-fr grid-flow-col border-t border-gray-100 bg-white pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Secciones">
       <a href="#inicio" data-nav="inicio" class="nav-mob"><i class="fa-solid fa-house" aria-hidden="true"></i><span>Inicio</span></a>
       <a href="#bodega" data-nav="bodega" class="nav-mob"><i class="fa-solid fa-bottle-water" aria-hidden="true"></i><span>Bodega</span></a>
       <a href="#bar" data-nav="bar" class="nav-mob"><i class="fa-solid fa-people-group" aria-hidden="true"></i><span>Bar</span></a>
+      <a href="#moderar" data-nav="moderar" class="nav-mob" data-admin-only hidden><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Moderar <span data-report-count hidden></span></span></a>
     </nav>
   </div>
 
@@ -219,7 +260,12 @@
       </section>
 
       <div id="detail-owner" class="border-t border-gray-100 pt-4" hidden>
-        <button type="button" id="detail-delete-post" class="btn-danger-soft w-full"><i class="fa-solid fa-trash" aria-hidden="true"></i> Eliminar publicación</button>
+        <button type="button" id="detail-delete-post" class="btn-danger-soft w-full"><i class="fa-solid fa-trash" aria-hidden="true"></i> <span>Eliminar publicación</span></button>
+      </div>
+      <div class="text-center">
+        <button type="button" id="detail-report" class="text-sm font-semibold text-gray-500 underline-offset-4 hover:text-red-700 hover:underline" hidden>
+          <i class="fa-regular fa-flag" aria-hidden="true"></i> Denunciar esta publicación
+        </button>
       </div>
     </div>
   </dialog>
@@ -260,6 +306,65 @@
       <p id="join-table-error" class="mt-3 text-sm text-red-700" role="alert" hidden></p>
       <button type="submit" id="join-table-submit" class="btn-primary mt-5 w-full">Unirme</button>
     </form>
+  </dialog>
+
+  <!-- DIÁLOGO: DENUNCIAR -->
+  <dialog id="report-dialog" class="sheet" aria-labelledby="report-title">
+    <form id="report-form" class="p-6" novalidate>
+      <header class="sheet-header">
+        <h2 id="report-title" class="text-lg font-bold">Denunciar</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Cerrar"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+      </header>
+      <p id="report-target" class="mb-4 text-sm text-gray-600"></p>
+      <fieldset class="space-y-2">
+        <legend class="field-label">¿Qué pasa?</legend>
+        <label class="report-option"><input type="radio" name="reason" value="ofensivo" class="accent-mustard-dark"> Ofensivo, violento o de mal gusto</label>
+        <label class="report-option"><input type="radio" name="reason" value="spam" class="accent-mustard-dark"> Spam o publicidad</label>
+        <label class="report-option"><input type="radio" name="reason" value="no-cerveza" class="accent-mustard-dark"> No tiene nada que ver con cerveza</label>
+        <label class="report-option"><input type="radio" name="reason" value="datos-personales" class="accent-mustard-dark"> Muestra datos o fotos de alguien sin permiso</label>
+        <label class="report-option"><input type="radio" name="reason" value="otro" class="accent-mustard-dark"> Otro motivo</label>
+      </fieldset>
+      <label for="report-details" class="field-label mt-4">Detalles <span class="font-normal normal-case text-gray-500">(opcional)</span></label>
+      <textarea id="report-details" class="input h-20 resize-none" maxlength="300"></textarea>
+      <p id="report-error" class="mt-3 text-sm text-red-700" role="alert" hidden></p>
+      <button type="submit" id="report-submit" class="btn-primary mt-5 w-full">Enviar denuncia</button>
+      <p class="mt-3 text-center text-xs text-gray-500">La persona denunciada no sabrá quién ha sido.</p>
+    </form>
+  </dialog>
+
+  <!-- DIÁLOGO: MI CUENTA -->
+  <dialog id="account-dialog" class="sheet" aria-labelledby="account-title">
+    <div class="p-6">
+      <header class="sheet-header">
+        <h2 id="account-title" class="text-lg font-bold">Mi cuenta</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Cerrar"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+      </header>
+      <div class="mb-5 flex items-center gap-3">
+        <i class="fa-solid fa-circle-user text-4xl text-gray-300" aria-hidden="true"></i>
+        <div class="min-w-0">
+          <p class="truncate font-bold" data-user-name></p>
+          <p class="truncate text-sm text-gray-600" data-user-email></p>
+        </div>
+      </div>
+      <div class="space-y-2">
+        <button type="button" data-action="logout" class="btn-secondary w-full"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Cerrar sesión</button>
+        <div class="flex justify-center gap-4 pt-2 text-sm">
+          <a href="/aviso-legal.html" target="_blank" class="link">Condiciones de uso</a>
+          <a href="/privacidad.html" target="_blank" class="link">Privacidad</a>
+        </div>
+      </div>
+
+      <details id="delete-account" class="mt-6 border-t border-gray-100 pt-4">
+        <summary class="cursor-pointer text-sm font-semibold text-red-700">Borrar mi cuenta</summary>
+        <form id="delete-account-form" class="mt-3 space-y-3" novalidate>
+          <p class="text-sm text-gray-600">Se borrarán tu perfil, tus publicaciones con sus fotos, tus notas y las mesas que hayas creado. <strong>No se puede deshacer.</strong></p>
+          <label for="delete-password" class="field-label">Escribe tu contraseña para confirmar</label>
+          <input id="delete-password" type="password" class="input" autocomplete="current-password">
+          <p id="delete-account-error" class="text-sm text-red-700" role="alert" hidden></p>
+          <button type="submit" id="delete-account-submit" class="btn-danger w-full">Borrar mi cuenta para siempre</button>
+        </form>
+      </details>
+    </div>
   </dialog>
 
   <!-- DIÁLOGO: CONFIRMACIÓN -->

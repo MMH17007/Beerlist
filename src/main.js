@@ -3,14 +3,16 @@ import '@fortawesome/fontawesome-free/css/solid.min.css';
 import '@fortawesome/fontawesome-free/css/regular.min.css';
 import './style.css';
 
+import { closeAccount, openAccount } from './account.js';
 import { initAuth, logout } from './auth.js';
 import { initBeers, openAddBeer } from './beers.js';
+import { initModeration } from './moderation.js';
 import { initTables, openCreateTable, openJoinTable } from './tables.js';
 import { $$, confirmAction, wireDialogs } from './ui.js';
 
 /* ---------- Navegación por pestañas con #hash (el botón atrás del móvil funciona) ---------- */
 
-const VIEWS = ['inicio', 'bodega', 'bar'];
+const VIEWS = ['inicio', 'bodega', 'bar', 'moderar'];
 
 function showView() {
   const current = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'inicio';
@@ -30,7 +32,9 @@ const ACTIONS = {
   'add-beer': openAddBeer,
   'create-table': openCreateTable,
   'join-table': openJoinTable,
+  account: openAccount,
   logout: async () => {
+    closeAccount();
     const ok = await confirmAction({ title: '¿Cerrar sesión?', message: 'Tendrás que volver a entrar con tu correo.', confirmLabel: 'Cerrar sesión' });
     if (ok) logout();
   },
@@ -57,7 +61,8 @@ initAuth({
   onSignedIn(profile) {
     stopListeners();
     for (const el of $$('[data-user-name]')) el.textContent = profile.name;
-    unsubscribers = [initBeers(profile), initTables(profile)];
+    for (const el of $$('[data-user-email]')) el.textContent = profile.email;
+    unsubscribers = [initBeers(profile), initTables(profile), initModeration(profile)];
     showView();
   },
   onSignedOut: stopListeners,

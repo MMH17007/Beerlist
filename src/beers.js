@@ -3,8 +3,10 @@
 import {
   addDoc, collection, deleteDoc, deleteField, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc,
 } from 'firebase/firestore';
+import { canPublish } from './auth.js';
 import { db } from './firebase.js';
-import { uploadImage } from './upload.js';
+import { openReport } from './reports.js';
+import { deleteImage, uploadImage } from './upload.js';
 import {
   $, closeDialog, confirmAction, friendlyError, h, icon, openDialog, setBusy, showError, timeAgo, toast,
 } from './ui.js';
@@ -28,7 +30,19 @@ function stats(beer) {
 }
 
 const myRating = (beer) => beer.ratings?.[me.uid] ?? null;
-const findBeer = (id) => beers.find((b) => b.id === id);
+export const findBeer = (id) => beers.find((b) => b.id === id);
+export const getBeers = () => beers;
+
+/** Borra una publicación y su foto (dueño o administrador). */
+export async function deleteBeer(beer) {
+  await deleteDoc(doc(db, 'beers', beer.id));
+  await deleteImage(beer.imagePath);
+}
+
+/** Quita la nota de un usuario (la suya propia, o cualquiera si eres administrador). */
+export function removeRating(beerId, uid) {
+  return updateDoc(doc(db, 'beers', beerId), { [`ratings.${uid}`]: deleteField() });
+}
 
 /* ---------- Render ---------- */
 
@@ -164,22 +178,62 @@ function refreshDetail() {
 
   const others = Object.entries(beer.ratings ?? {})
     .filter(([uid]) => uid !== me.uid)
-    .map(([, r]) => r)
-    .sort((a, b) => (b.updatedAt?.seconds ?? 0) - (a.updatedAt?.seconds ?? 0));
+    .sort(([, a], [, b]) => (b.updatedAt?.seconds ?? 0) - (a.updatedAt?.seconds ?? 0));
 
   $('#detail-reviews').replaceChildren(...(others.length
-    ? others.map((r) => h('li', { class: 'rounded-xl bg-gray-50 p-3' },
-      h('div', { class: 'flex items-center justify-between text-sm' },
-        h('span', { class: 'font-bold' }, r.name || 'Anónimo'),
-        h('span', { class: 'font-bold text-mustard-ink' }, '★ ', String(r.rating))),
-      r.comment ? h('p', { class: 'mt-1 text-sm text-gray-700' }, r.comment) : null))
+    ? others.map(([uid, r]) => reviewItem(beer, uid, r))
     : [h('li', { class: 'text-sm text-gray-600' }, 'Nadie más la ha valorado todavía.')]));
 
-  $('#detail-owner').hidden = beer.createdBy !== me.uid;
+  const isOwner = beer.createdBy === me.uid;
+  $('#detail-owner').hidden = !isOwner && !me.isAdmin;
+  $('#detail-delete-post span').textContent = isOwner ? 'Eliminar publicación' : 'Eliminar publicación (moderación)';
+  $('#detail-report').hidden = isOwner;
   $('#rating-delete').hidden = !myRating(beer);
 }
 
-function openDetail(beerId) {
+function reviewItem(beer, uid, review) {
+  const actions = h('div', { class: 'flex items-center gap-1' },
+    h('button', {
+      type: 'button',
+      class: 'icon-btn h-9 w-9 text-gray-400 hover:text-red-700',
+      'aria-label': `Denunciar el comentario de ${review.name || 'este usuario'}`,
+      title: 'Denunciar',
+      onclick: () => openReport({ beer, reviewUid: uid, reviewName: review.name, reviewText: review.comment }),
+    }, icon('flag', '', 'regular')),
+    me.isAdmin
+      ? h('button', {
+        type: 'button',
+        class: 'icon-btn h-9 w-9 text-gray-400 hover:text-red-700',
+        'aria-label': 'Borrar este comentario (moderación)',
+        title: 'Borrar (moderación)',
+        onclick: () => moderateReview(beer, uid, review),
+      }, icon('trash-can', '', 'regular'))
+      : null);
+
+  return h('li', { class: 'rounded-xl bg-gray-50 p-3' },
+    h('div', { class: 'flex items-center justify-between gap-2 text-sm' },
+      h('span', { class: 'font-bold' }, review.name || 'Anónimo'),
+      h('span', { class: 'ml-auto font-bold text-mustard-ink' }, '★ ', String(review.rating)),
+      actions),
+    review.comment ? h('p', { class: 'mt-1 text-sm text-gray-700' }, review.comment) : null);
+}
+
+async function moderateReview(beer, uid, review) {
+  const ok = await confirmAction({
+    title: `¿Borrar la nota de ${review.name || 'este usuario'}?`,
+    message: 'Se quitará la nota y el comentario de esta cerveza.',
+    confirmLabel: 'Borrar',
+  });
+  if (!ok) return;
+  try {
+    await removeRating(beer.id, uid);
+    toast('Comentario borrado');
+  } catch (error) {
+    toast(friendlyError(error), { type: 'error' });
+  }
+}
+
+export function openDetail(beerId) {
   const beer = findBeer(beerId);
   if (!beer) return;
   activeBeerId = beerId;
@@ -204,6 +258,7 @@ async function saveRating(event) {
     $('#star-group button')?.focus();
     return;
   }
+  if (!canPublish()) return;
   const button = $('#rating-save');
   setBusy(button, true, 'Guardando…');
   try {
@@ -232,7 +287,7 @@ async function deleteRating() {
   });
   if (!ok) return;
   try {
-    await updateDoc(doc(db, 'beers', activeBeerId), { [`ratings.${me.uid}`]: deleteField() });
+    await removeRating(activeBeerId, me.uid);
     closeDialog($('#detail-dialog'));
     toast('Nota borrada');
   } catch (error) {
@@ -253,7 +308,7 @@ async function deletePost() {
   });
   if (!ok) return;
   try {
-    await deleteDoc(doc(db, 'beers', beer.id));
+    await deleteBeer(beer);
     closeDialog($('#detail-dialog'));
     toast('Publicación eliminada');
   } catch (error) {
@@ -279,6 +334,7 @@ function setPreview(file) {
 }
 
 export function openAddBeer() {
+  if (!canPublish()) return;
   $('#add-form').reset();
   setPreview(null);
   showError($('#add-error'), '');
@@ -307,24 +363,28 @@ async function publishBeer(event) {
 
   const button = $('#add-submit');
   showError(error, '');
+  let uploaded = null;
   try {
     setBusy(button, true, 'Subiendo foto…');
-    const imageUrl = await uploadImage(selectedFile);
+    uploaded = await uploadImage(selectedFile, me.uid);
     setBusy(button, true, 'Guardando…');
     const ref = await addDoc(collection(db, 'beers'), {
       name,
-      imageUrl,
+      imageUrl: uploaded.imageUrl,
+      imagePath: uploaded.imagePath,
       createdAt: serverTimestamp(),
       createdBy: me.uid,
       createdByName: me.name,
       ratings: {},
     });
+    uploaded = null;
     closeDialog($('#add-dialog'));
     toast('¡Publicada! Ponle nota ahora que la tienes delante.');
     location.hash = '#inicio';
     // Abrimos directamente la valoración: es lo siguiente que casi todo el mundo quiere hacer.
     setTimeout(() => openDetail(ref.id), 300);
   } catch (err) {
+    if (uploaded) deleteImage(uploaded.imagePath); // no dejamos fotos huérfanas
     showError(error, friendlyError(err));
   } finally {
     setBusy(button, false);
@@ -361,6 +421,10 @@ export function initBeers(profile) {
     $('#rating-form').addEventListener('submit', saveRating);
     $('#rating-delete').addEventListener('click', deleteRating);
     $('#detail-delete-post').addEventListener('click', deletePost);
+    $('#detail-report').addEventListener('click', () => {
+      const beer = findBeer(activeBeerId);
+      if (beer) openReport({ beer });
+    });
     $('#detail-dialog').addEventListener('close', () => { activeBeerId = null; });
     $('#rating-comment').addEventListener('input', (e) => {
       $('#rating-count').textContent = `${e.target.value.length}/500`;

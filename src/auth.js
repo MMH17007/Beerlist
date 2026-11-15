@@ -1,11 +1,12 @@
 // Acceso abierto: cualquiera crea su cuenta con correo y contraseña.
-// Además de la cuenta, cada usuario tiene un perfil en /members/{uid} con su nombre visible;
-// las reglas de Firestore exigen ese perfil para leer y escribir.
+// Cada usuario tiene además un perfil en /members/{uid} (nombre visible, mayoría de edad y
+// aceptación de condiciones). Para publicar hay que confirmar el correo.
 
 import {
   createUserWithEmailAndPassword,
   deleteUser,
   onAuthStateChanged,
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
@@ -21,12 +22,12 @@ const MODES = {
     subtitle: 'Tu diario de cervezas',
   },
   register: {
-    fields: ['name', 'email', 'password'],
+    fields: ['name', 'email', 'password', 'consent'],
     submit: 'Crear cuenta',
     subtitle: 'Gratis y en menos de un minuto',
   },
   activate: {
-    fields: ['name'],
+    fields: ['name', 'consent'],
     submit: 'Continuar',
     subtitle: 'Un último paso: ¿cómo quieres que te vean los demás?',
   },
@@ -34,16 +35,18 @@ const MODES = {
 
 const AUTH_ERRORS = {
   'auth/invalid-credential': 'Correo o contraseña incorrectos.',
+  'auth/wrong-password': 'Contraseña incorrecta.',
   'auth/invalid-email': 'Ese correo no parece válido.',
   'auth/email-already-in-use': 'Ya hay una cuenta con ese correo. Prueba a entrar.',
   'auth/weak-password': 'La contraseña necesita al menos 6 caracteres.',
   'auth/too-many-requests': 'Demasiados intentos. Espera unos minutos.',
   'auth/network-request-failed': 'Sin conexión. Revisa tu internet.',
-  'permission-denied': 'No se ha podido crear tu perfil. Prueba con otro nombre.',
+  'permission-denied': 'No se ha podido crear tu perfil. Revisa los datos.',
 };
 
 let mode = 'login';
 let registering = false;
+let profile = null;
 
 const screen = $('#auth-screen');
 const form = $('#auth-form');
@@ -51,13 +54,15 @@ const errorEl = $('#auth-error');
 const submit = $('#auth-submit');
 const field = (name) => $(`#auth-${name}`);
 
+/* ---------- Formulario de acceso ---------- */
+
 function setMode(next) {
   mode = next;
   const config = MODES[next];
   for (const wrapper of $$('[data-field]', form)) {
     const visible = config.fields.includes(wrapper.dataset.field);
     wrapper.hidden = !visible;
-    wrapper.querySelector('input').required = visible;
+    for (const input of $$('input', wrapper)) input.required = visible;
   }
   for (const tab of $$('#auth-tabs [data-mode]')) {
     tab.setAttribute('aria-selected', String(tab.dataset.mode === next));
@@ -76,6 +81,8 @@ function readValues() {
     name: field('name').value.trim(),
     email: field('email').value.trim(),
     password: field('password').value,
+    adult: field('adult').checked,
+    terms: field('terms').checked,
   };
 }
 
@@ -84,19 +91,28 @@ function validate(values) {
   if (needed.includes('name') && !values.name) return 'Escribe tu nombre o apodo.';
   if (needed.includes('email') && !values.email) return 'Escribe tu correo.';
   if (needed.includes('password') && values.password.length < 6) return 'La contraseña necesita al menos 6 caracteres.';
+  if (needed.includes('consent') && !values.adult) return 'Beerlist es solo para mayores de 18 años.';
+  if (needed.includes('consent') && !values.terms) return 'Tienes que aceptar las condiciones de uso y la política de privacidad.';
   return '';
 }
 
-function messageFor(error) {
+export function authMessage(error) {
   const code = error?.code ?? '';
   const key = Object.keys(AUTH_ERRORS).find((k) => code.includes(k));
   return key ? AUTH_ERRORS[key] : 'No se ha podido completar. Inténtalo de nuevo.';
 }
 
-/** Crea el perfil público (nombre visible) del usuario. */
+/** Crea el perfil público del usuario con su consentimiento. */
 function createProfile(uid, name) {
-  return setDoc(doc(db, 'members', uid), { name, createdAt: serverTimestamp() });
+  return setDoc(doc(db, 'members', uid), {
+    name,
+    adult: true,
+    acceptedTermsAt: serverTimestamp(),
+    createdAt: serverTimestamp(),
+  });
 }
+
+const verifySettings = () => ({ url: location.origin });
 
 async function handleSubmit(event) {
   event.preventDefault();
@@ -120,13 +136,15 @@ async function handleSubmit(event) {
       } finally {
         registering = false;
       }
+      sendEmailVerification(user, verifySettings()).catch(() => {});
       await resolveUser(user);
+      toast('¡Bienvenido! Revisa tu correo para confirmar la cuenta.');
     } else {
       await createProfile(auth.currentUser.uid, values.name);
       await resolveUser(auth.currentUser);
     }
   } catch (error) {
-    showError(errorEl, messageFor(error));
+    showError(errorEl, authMessage(error));
   } finally {
     setBusy(submit, false);
   }
@@ -143,20 +161,64 @@ async function handleForgot() {
     await sendPasswordResetEmail(auth, email);
     toast('Te hemos enviado un correo para cambiar la contraseña.');
   } catch (error) {
-    showError(errorEl, messageFor(error));
+    showError(errorEl, authMessage(error));
   }
 }
+
+/* ---------- Verificación de correo ---------- */
+
+function renderVerification() {
+  $('#verify-banner').hidden = !profile || profile.verified;
+}
+
+/** Úsalo antes de cualquier acción que publique algo. */
+export function canPublish() {
+  if (profile?.verified) return true;
+  toast('Confirma tu correo para poder publicar. Mira el aviso de arriba.', { type: 'error' });
+  $('#verify-banner').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  return false;
+}
+
+async function resendVerification(event) {
+  const button = event.currentTarget;
+  setBusy(button, true, 'Enviando…');
+  try {
+    await sendEmailVerification(auth.currentUser, verifySettings());
+    toast(`Enlace enviado a ${auth.currentUser.email}. Mira también en spam.`);
+  } catch (error) {
+    toast(authMessage(error), { type: 'error' });
+  } finally {
+    setBusy(button, false);
+  }
+}
+
+async function checkVerification(event) {
+  const button = event.currentTarget;
+  setBusy(button, true, 'Comprobando…');
+  try {
+    await auth.currentUser.reload();
+    if (auth.currentUser.emailVerified) {
+      await auth.currentUser.getIdToken(true); // el permiso para publicar viaja en el token
+      profile.verified = true;
+      renderVerification();
+      toast('¡Correo confirmado! Ya puedes publicar.');
+    } else {
+      toast('Todavía no aparece como confirmado. Pulsa el enlace del correo y vuelve a probar.', { type: 'error' });
+    }
+  } finally {
+    setBusy(button, false);
+  }
+}
+
+/* ---------- Sesión ---------- */
 
 let onSignedIn = () => {};
 let onSignedOut = () => {};
 
-function hideSplash() {
-  $('#splash').hidden = true;
-}
-
 async function resolveUser(user) {
-  hideSplash();
+  $('#splash').hidden = true;
   if (!user) {
+    profile = null;
     if (mode === 'activate') setMode('login');
     screen.hidden = false;
     $('#app').hidden = true;
@@ -166,18 +228,30 @@ async function resolveUser(user) {
 
   const snapshot = await getDoc(doc(db, 'members', user.uid)).catch(() => null);
   if (!snapshot?.exists()) {
-    // Cuenta de la versión anterior (sin perfil): pedimos el nombre una vez.
+    // Cuenta de la versión anterior (sin perfil): pedimos nombre y consentimiento una vez.
     setMode('activate');
     screen.hidden = false;
     $('#app').hidden = true;
     return;
   }
 
+  const admin = await getDoc(doc(db, 'admins', user.uid)).then((s) => s.exists()).catch(() => false);
+
+  profile = {
+    uid: user.uid,
+    email: user.email,
+    name: snapshot.data().name,
+    verified: user.emailVerified,
+    isAdmin: admin,
+  };
   screen.hidden = true;
   $('#app').hidden = false;
   form.reset();
-  onSignedIn({ uid: user.uid, email: user.email, name: snapshot.data().name });
+  renderVerification();
+  onSignedIn(profile);
 }
+
+export const currentProfile = () => profile;
 
 export function logout() {
   return signOut(auth);
@@ -194,6 +268,8 @@ export function initAuth(handlers) {
   }
   $('#auth-forgot').addEventListener('click', handleForgot);
   $('#auth-switch-account').addEventListener('click', logout);
+  $('#verify-resend').addEventListener('click', resendVerification);
+  $('#verify-check').addEventListener('click', checkVerification);
   $('#auth-toggle-password').addEventListener('click', (event) => {
     const input = field('password');
     const show = input.type === 'password';

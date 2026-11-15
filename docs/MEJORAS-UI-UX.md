@@ -42,14 +42,14 @@ Revisión de la versión hecha con Gemini (un único `index.html`). Primero lo q
 
 ## Propuestas (siguiente paso)
 
-### Imprescindible al abrir el registro
-- **Textos legales.** Una web abierta con cuentas en España necesita política de privacidad, aviso legal y casilla de aceptación al registrarse (RGPD/LSSI), además de una forma de borrar la cuenta.
-- **Moderación.** Botón de "denunciar" en fotos y comentarios, y poder borrar contenido como administrador.
-- **Verificación de correo** para frenar cuentas falsas o de spam.
-- **Límite de subidas** por usuario para que nadie agote la cuota de fotos.
+### Hecho al abrir el registro
+- ✅ **Textos legales**: aviso legal, condiciones de uso y política de privacidad; casillas de mayoría de edad y aceptación al registrarse; borrar la cuenta con todos sus datos.
+- ✅ **Moderación**: botón "Denunciar" en publicaciones y comentarios; pestaña *Moderar* para administradores.
+- ✅ **Verificación de correo** obligatoria para publicar, valorar y usar mesas.
+- ✅ **Fotos sin clave expuesta**: Firebase Storage con reglas (solo tu carpeta, solo imágenes, máx. 2 MB). La foto se borra al borrar la publicación.
 
 ### Alta prioridad
-1. **Fotos sin clave expuesta.** ImgBB obliga a llevar la clave dentro de la web. Pasar a Cloudinary con *upload preset* sin firmar (gratis, sin clave secreta) o a Firebase Storage. Además permitiría borrar la foto al borrar la publicación, que hoy queda en ImgBB.
+1. **Límite de subidas por usuario** (p. ej. 20 al día) para que nadie agote la cuota de Storage.
 2. **Instalable como app (PWA completa).** Ya hay manifiesto e icono; falta el *service worker* para que se instale en la pantalla de inicio y abra sin conexión.
 3. **Feed dentro de cada mesa.** Ahora una mesa solo muestra quién está. Lo natural: ver qué cervezas ha valorado la gente de esa mesa, y un "ronda actual" para la quedada.
 

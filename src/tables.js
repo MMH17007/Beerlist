@@ -5,6 +5,7 @@ import {
   arrayRemove, arrayUnion, collection, deleteDoc, deleteField, doc, getDoc, onSnapshot, query,
   serverTimestamp, setDoc, updateDoc, where,
 } from 'firebase/firestore';
+import { canPublish } from './auth.js';
 import { db } from './firebase.js';
 import {
   $, closeDialog, confirmAction, copyText, friendlyError, h, icon, openDialog, setBusy, showError, toast,
@@ -17,6 +18,8 @@ const CODE_LENGTH = 6;
 let me = null;
 let tables = [];
 let loaded = false;
+
+export const getTables = () => tables;
 
 function newCode() {
   const values = crypto.getRandomValues(new Uint32Array(CODE_LENGTH));
@@ -96,6 +99,7 @@ function render() {
 /* ---------- Acciones ---------- */
 
 export function openCreateTable() {
+  if (!canPublish()) return;
   $('#create-table-form').reset();
   $('#create-table-form').hidden = false;
   $('#create-table-result').hidden = true;
@@ -136,6 +140,7 @@ async function createTable(event) {
 }
 
 export function openJoinTable() {
+  if (!canPublish()) return;
   $('#join-table-form').reset();
   showError($('#join-table-error'), '');
   openDialog($('#join-table-dialog'));
