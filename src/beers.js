@@ -6,7 +6,7 @@ import {
 import { canPublish } from './auth.js';
 import { db } from './firebase.js';
 import { openReport } from './reports.js';
-import { deleteImage, uploadImage } from './upload.js';
+import { deleteImage, previewUrl, uploadImage } from './upload.js';
 import {
   $, closeDialog, confirmAction, friendlyError, h, icon, openDialog, setBusy, showError, timeAgo, toast,
 } from './ui.js';
@@ -318,18 +318,31 @@ async function deletePost() {
 
 /* ---------- Añadir cerveza ---------- */
 
-function setPreview(file) {
+async function setPreview(file) {
   selectedFile = file;
   const preview = $('#add-preview');
-  if (file) {
-    preview.src = URL.createObjectURL(file);
+  const hint = $('#add-drop-hint');
+  if (preview.src) URL.revokeObjectURL(preview.src);
+  preview.removeAttribute('src');
+  preview.hidden = true;
+  hint.hidden = false;
+  showError($('#add-error'), '');
+  if (!file) return;
+
+  hint.replaceChildren(icon('spinner', 'fa-spin text-2xl'), h('span', { class: 'text-sm font-medium' }, 'Preparando la foto…'));
+  try {
+    const url = await previewUrl(file);
+    if (selectedFile !== file) return URL.revokeObjectURL(url); // eligió otra mientras tanto
+    preview.src = url;
     preview.hidden = false;
-    $('#add-drop-hint').hidden = true;
-  } else {
-    if (preview.src) URL.revokeObjectURL(preview.src);
-    preview.removeAttribute('src');
-    preview.hidden = true;
-    $('#add-drop-hint').hidden = false;
+    hint.hidden = true;
+  } catch {
+    selectedFile = null;
+    showError($('#add-error'), 'No hemos podido abrir esa foto. Prueba con otra o haz una captura de pantalla de ella.');
+  } finally {
+    hint.replaceChildren(icon('camera', 'text-3xl'),
+      h('span', { class: 'text-sm font-medium' }, 'Haz una foto o elige una'),
+      h('span', { class: 'text-xs' }, 'De la cámara o de la galería'));
   }
 }
 
@@ -345,7 +358,7 @@ async function publishBeer(event) {
   event.preventDefault();
   const name = $('#add-name').value.trim();
   const error = $('#add-error');
-  if (!selectedFile) return showError(error, 'Añade una foto de la cerveza.');
+  if (!selectedFile || $('#add-preview').hidden) return showError(error, 'Añade una foto de la cerveza.');
   if (!name) {
     $('#add-name').focus();
     return showError(error, 'Escribe el nombre de la cerveza.');
@@ -400,7 +413,7 @@ function wireAddDialog() {
     e.preventDefault();
     drop.classList.remove('is-dragging');
     const file = e.dataTransfer.files?.[0];
-    if (file?.type.startsWith('image/')) setPreview(file);
+    if (file) setPreview(file); // el formato se comprueba al abrirla
   });
   $('#add-form').addEventListener('submit', publishBeer);
 }
