@@ -1,0 +1,114 @@
+rules_version = '2';
+
+// Beerlist: solo entran miembros con código de invitación válido.
+// El código vive en /config/invite, que ningún cliente puede leer; solo lo consultan estas reglas.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMember() {
+      return signedIn() && exists(/databases/$(database)/documents/members/$(request.auth.uid));
+    }
+
+    function isString(value, min, max) {
+      return value is string && value.size() >= min && value.size() <= max;
+    }
+
+    // ---------- Configuración privada (solo desde la consola de Firebase) ----------
+    match /config/{docId} {
+      allow read, write: if false;
+    }
+
+    // ---------- Miembros ----------
+    match /members/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+
+      // Alta: solo con el código correcto.
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'inviteCode', 'createdAt'])
+        && isString(request.resource.data.name, 1, 30)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.inviteCode == get(/databases/$(database)/documents/config/invite).data.code;
+
+      // Cada uno puede cambiar su nombre, nada más.
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+        && isString(request.resource.data.name, 1, 30);
+    }
+
+    // ---------- Cervezas ----------
+    match /beers/{beerId} {
+      allow read: if isMember();
+
+      allow create: if isMember()
+        && request.resource.data.keys().hasOnly(['name', 'imageUrl', 'createdAt', 'createdBy', 'createdByName', 'ratings'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && isString(request.resource.data.name, 1, 80)
+        && isString(request.resource.data.createdByName, 1, 30)
+        && request.resource.data.imageUrl is string
+        && request.resource.data.imageUrl.matches('https://.+')
+        && request.resource.data.ratings == {};
+
+      // Valorar: cada uno solo toca SU nota dentro de "ratings".
+      allow update: if isMember()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratings'])
+        && request.resource.data.get('ratings', {}).diff(resource.data.get('ratings', {})).affectedKeys().hasOnly([request.auth.uid])
+        && validRating(request.resource.data.get('ratings', {}));
+
+      // Borrar: solo quien la publicó.
+      allow delete: if isMember() && resource.data.createdBy == request.auth.uid;
+    }
+
+    function validRating(ratings) {
+      return !(request.auth.uid in ratings) || (
+        ratings[request.auth.uid].keys().hasOnly(['rating', 'comment', 'name', 'updatedAt'])
+        && ratings[request.auth.uid].rating is int
+        && ratings[request.auth.uid].rating >= 1
+        && ratings[request.auth.uid].rating <= 5
+        && isString(ratings[request.auth.uid].comment, 0, 500)
+        && isString(ratings[request.auth.uid].name, 1, 30)
+      );
+    }
+
+    // ---------- Mesas (el ID del documento es el código de 6 caracteres) ----------
+    match /tables/{code} {
+      // Leer una mesa concreta conociendo el código (para unirse).
+      allow get: if isMember();
+      // Listar solo las mesas en las que estoy.
+      allow list: if isMember() && request.auth.uid in resource.data.memberIds;
+
+      allow create: if isMember()
+        && code.matches('^[A-Z0-9]{6}$')
+        && request.resource.data.keys().hasOnly(['name', 'ownerId', 'ownerName', 'createdAt', 'memberIds', 'members'])
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && isString(request.resource.data.name, 1, 40)
+        && request.resource.data.memberIds == [request.auth.uid]
+        && request.resource.data.members.keys().hasOnly([request.auth.uid]);
+
+      // Unirse o "pagar la cuenta": cada uno solo se añade o se quita a sí mismo.
+      // El creador no sale: cierra la mesa.
+      allow update: if isMember()
+        && request.auth.uid != resource.data.ownerId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'members'])
+        && onlySelfChanged()
+        && request.resource.data.memberIds.size() <= 50;
+
+      allow delete: if isMember() && resource.data.ownerId == request.auth.uid;
+    }
+
+    function onlySelfChanged() {
+      let before = resource.data.memberIds.toSet();
+      let after = request.resource.data.memberIds.toSet();
+      return after.difference(before).union(before.difference(after)).hasOnly([request.auth.uid])
+        && request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([request.auth.uid]);
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "Beerlist",
+  "short_name": "Beerlist",
+  "description": "El diario privado de cervezas de tu grupo de amigos.",
+  "lang": "es",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F9FAFB",
+  "theme_color": "#EAB308",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
