@@ -87,7 +87,7 @@ function renderHome() {
     return grid.replaceChildren(emptyState({
       iconName: 'beer-mug-empty',
       title: 'La barra está vacía',
-      text: 'Sube la primera cerveza y estrena la app con el grupo.',
+      text: 'Sube la primera cerveza y estrena la comunidad.',
       action: h('button', { type: 'button', class: 'btn-primary', onclick: openAddBeer }, icon('camera'), 'Subir la primera'),
     }));
   }
@@ -170,7 +170,7 @@ function refreshDetail() {
   $('#detail-reviews').replaceChildren(...(others.length
     ? others.map((r) => h('li', { class: 'rounded-xl bg-gray-50 p-3' },
       h('div', { class: 'flex items-center justify-between text-sm' },
-        h('span', { class: 'font-bold' }, r.name || 'Alguien del grupo'),
+        h('span', { class: 'font-bold' }, r.name || 'Anónimo'),
         h('span', { class: 'font-bold text-mustard-ink' }, '★ ', String(r.rating))),
       r.comment ? h('p', { class: 'mt-1 text-sm text-gray-700' }, r.comment) : null))
     : [h('li', { class: 'text-sm text-gray-600' }, 'Nadie más la ha valorado todavía.')]));
@@ -247,8 +247,8 @@ async function deletePost() {
   const ok = await confirmAction({
     title: `¿Eliminar «${beer.name}»?`,
     message: count
-      ? `Se borrará para todo el grupo junto con ${count} ${count === 1 ? 'nota' : 'notas'}. No se puede deshacer.`
-      : 'Se borrará para todo el grupo. No se puede deshacer.',
+      ? `Se borrará para todo el mundo junto con ${count} ${count === 1 ? 'nota' : 'notas'}. No se puede deshacer.`
+      : 'Se borrará para todo el mundo. No se puede deshacer.',
     confirmLabel: 'Eliminar',
   });
   if (!ok) return;

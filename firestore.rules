@@ -1,7 +1,7 @@
 rules_version = '2';
 
-// Beerlist: solo entran miembros con código de invitación válido.
-// El código vive en /config/invite, que ningún cliente puede leer; solo lo consultan estas reglas.
+// Beerlist: registro abierto. Para leer o escribir hace falta cuenta y perfil (/members/{uid}).
+// Cada usuario solo modifica lo suyo; las mesas solo las ven quienes están sentados en ellas.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -18,22 +18,16 @@ service cloud.firestore {
       return value is string && value.size() >= min && value.size() <= max;
     }
 
-    // ---------- Configuración privada (solo desde la consola de Firebase) ----------
-    match /config/{docId} {
-      allow read, write: if false;
-    }
-
-    // ---------- Miembros ----------
+    // ---------- Perfiles ----------
     match /members/{uid} {
       allow get: if signedIn() && request.auth.uid == uid;
 
-      // Alta: solo con el código correcto.
+      // Alta libre: cada uno crea solo su propio perfil.
       allow create: if signedIn()
         && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'inviteCode', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['name', 'createdAt'])
         && isString(request.resource.data.name, 1, 30)
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.inviteCode == get(/databases/$(database)/documents/config/invite).data.code;
+        && request.resource.data.createdAt == request.time;
 
       // Cada uno puede cambiar su nombre, nada más.
       allow update: if signedIn()

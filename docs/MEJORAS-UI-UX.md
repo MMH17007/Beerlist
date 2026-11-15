@@ -9,7 +9,7 @@ Revisión de la versión hecha con Gemini (un único `index.html`). Primero lo q
 | --- | --- |
 | `authDomain: "www.beerlist.com"`: el login fallaba fuera de tu ordenador | Dominio real de Firebase, desde `.env` |
 | Reglas de Firestore abiertas (`allow read, write: if true`) | Reglas por colección: solo miembros, cada uno toca lo suyo |
-| Código de invitación dentro del HTML: cualquiera lo leía con "Ver código fuente" o se lo saltaba llamando a Firebase directamente | El código está en Firestore y solo lo comprueban las reglas |
+| Código de invitación dentro del HTML: cualquiera lo leía con "Ver código fuente" o se lo saltaba llamando a Firebase directamente | Registro abierto a todo el mundo, sin invitación (decisión de producto) |
 | Al crear una mesa se descargaban **todas** las mesas de todos y se filtraban en el móvil | Cada uno solo recibe sus mesas; unirse es una lectura directa por código |
 | Nombres y comentarios metidos con `innerHTML`: un comentario podía inyectar código | Todo se pinta como texto |
 | "Pagar la cuenta", la cerveza junto al creador y copiar el código se perdieron en la última versión | Recuperados |
@@ -17,7 +17,7 @@ Revisión de la versión hecha con Gemini (un único `index.html`). Primero lo q
 
 ### Experiencia de uso
 1. **Pantalla de carga** en vez de ver el login un segundo aunque ya tengas sesión.
-2. **Registro con nombre**: te lo pide una vez y ya no lo vuelves a escribir al crear o unirte a una mesa.
+2. **Registro libre con nombre**: cualquiera crea su cuenta; el nombre se pide una vez y ya no se vuelve a escribir al crear o unirse a una mesa.
 3. **Recuperar contraseña** y botón para ver la contraseña al escribirla.
 4. **Los comentarios del grupo se ven**: antes la nota decía "Público", pero nadie podía leerla.
 5. **Tras publicar, se abre directamente la valoración**, que es lo siguiente que quiere hacer casi todo el mundo.
@@ -41,6 +41,12 @@ Revisión de la versión hecha con Gemini (un único `index.html`). Primero lo q
 - Se respeta "reducir movimiento" del sistema y los bordes de los móviles con notch.
 
 ## Propuestas (siguiente paso)
+
+### Imprescindible al abrir el registro
+- **Textos legales.** Una web abierta con cuentas en España necesita política de privacidad, aviso legal y casilla de aceptación al registrarse (RGPD/LSSI), además de una forma de borrar la cuenta.
+- **Moderación.** Botón de "denunciar" en fotos y comentarios, y poder borrar contenido como administrador.
+- **Verificación de correo** para frenar cuentas falsas o de spam.
+- **Límite de subidas** por usuario para que nadie agote la cuota de fotos.
 
 ### Alta prioridad
 1. **Fotos sin clave expuesta.** ImgBB obliga a llevar la clave dentro de la web. Pasar a Cloudinary con *upload preset* sin firmar (gratis, sin clave secreta) o a Firebase Storage. Además permitiría borrar la foto al borrar la publicación, que hoy queda en ImgBB.

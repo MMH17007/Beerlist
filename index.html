@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#EAB308">
-  <meta name="description" content="Beerlist: el diario privado de cervezas de tu grupo de amigos.">
+  <meta name="description" content="Beerlist: sube, valora y comparte las cervezas que pruebas. Crea mesas privadas con tus amigos.">
   <meta name="robots" content="noindex">
   <title>Beerlist · Tu diario de cervezas</title>
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
@@ -22,7 +22,7 @@
   <section id="auth-screen" class="fixed inset-0 z-50 overflow-y-auto bg-gray-50" hidden>
     <div class="mx-auto flex min-h-full w-full max-w-sm flex-col justify-center px-4 py-10">
       <p class="logo text-center text-5xl">beerlist<span>.</span></p>
-      <p id="auth-subtitle" class="mt-2 mb-8 text-center text-sm text-gray-600">Acceso exclusivo para amigos</p>
+      <p id="auth-subtitle" class="mt-2 mb-8 text-center text-sm text-gray-600">Tu diario de cervezas</p>
 
       <div class="card p-6">
         <div id="auth-tabs" class="mb-6 grid grid-cols-2 rounded-xl bg-gray-100 p-1" role="tablist" aria-label="Tipo de acceso">
@@ -48,11 +48,6 @@
               </button>
             </div>
           </div>
-          <div data-field="code" hidden>
-            <label for="auth-code" class="field-label">Código de invitación</label>
-            <input id="auth-code" name="code" type="text" class="input font-mono tracking-wider" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Te lo pasa quien te invita">
-          </div>
-
           <p id="auth-error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert" hidden></p>
 
           <button type="submit" id="auth-submit" class="btn-primary w-full">Entrar</button>
@@ -105,7 +100,7 @@
       <section id="view-inicio" data-view="inicio" aria-labelledby="h-inicio">
         <div class="mb-5">
           <h1 id="h-inicio" class="view-title">Explorar cervezas</h1>
-          <p class="view-subtitle">Todo lo que ha subido el grupo. Toca una para valorarla.</p>
+          <p class="view-subtitle">Todo lo que ha subido la comunidad. Toca una para valorarla.</p>
         </div>
         <div class="mb-5 flex flex-col gap-2 sm:flex-row">
           <label class="relative flex-1">
@@ -207,7 +202,7 @@
         </fieldset>
         <div>
           <div class="flex items-center justify-between">
-            <label for="rating-comment" class="field-label">Comentario <span class="font-normal normal-case text-gray-500">· lo ve todo el grupo</span></label>
+            <label for="rating-comment" class="field-label">Comentario <span class="font-normal normal-case text-gray-500">· es público</span></label>
             <span id="rating-count" class="text-xs text-gray-500">0/500</span>
           </div>
           <textarea id="rating-comment" class="input h-28 resize-none" maxlength="500" placeholder="¿Qué te ha parecido?"></textarea>
@@ -219,7 +214,7 @@
       </form>
 
       <section aria-labelledby="reviews-title">
-        <h3 id="reviews-title" class="field-label">Lo que opina el grupo</h3>
+        <h3 id="reviews-title" class="field-label">Lo que opinan los demás</h3>
         <ul id="detail-reviews" class="space-y-3"></ul>
       </section>
 

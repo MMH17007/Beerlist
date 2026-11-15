@@ -1,6 +1,6 @@
-// Acceso con código de invitación.
-// El código NO está en este archivo: vive en Firestore (config/invite) y solo lo comprueban
-// las reglas de seguridad. Así no se puede leer mirando el código de la web ni el repo.
+// Acceso abierto: cualquiera crea su cuenta con correo y contraseña.
+// Además de la cuenta, cada usuario tiene un perfil en /members/{uid} con su nombre visible;
+// las reglas de Firestore exigen ese perfil para leer y escribir.
 
 import {
   createUserWithEmailAndPassword,
@@ -18,17 +18,17 @@ const MODES = {
   login: {
     fields: ['email', 'password'],
     submit: 'Entrar',
-    subtitle: 'Acceso exclusivo para amigos',
+    subtitle: 'Tu diario de cervezas',
   },
   register: {
-    fields: ['name', 'email', 'password', 'code'],
+    fields: ['name', 'email', 'password'],
     submit: 'Crear cuenta',
-    subtitle: 'Necesitas el código que te ha pasado el grupo',
+    subtitle: 'Gratis y en menos de un minuto',
   },
   activate: {
-    fields: ['name', 'code'],
-    submit: 'Activar cuenta',
-    subtitle: 'Tu cuenta ya existe. Solo falta el código de invitación.',
+    fields: ['name'],
+    submit: 'Continuar',
+    subtitle: 'Un último paso: ¿cómo quieres que te vean los demás?',
   },
 };
 
@@ -39,7 +39,7 @@ const AUTH_ERRORS = {
   'auth/weak-password': 'La contraseña necesita al menos 6 caracteres.',
   'auth/too-many-requests': 'Demasiados intentos. Espera unos minutos.',
   'auth/network-request-failed': 'Sin conexión. Revisa tu internet.',
-  'permission-denied': 'Código de invitación incorrecto.',
+  'permission-denied': 'No se ha podido crear tu perfil. Prueba con otro nombre.',
 };
 
 let mode = 'login';
@@ -76,7 +76,6 @@ function readValues() {
     name: field('name').value.trim(),
     email: field('email').value.trim(),
     password: field('password').value,
-    code: field('code').value.trim(),
   };
 }
 
@@ -85,7 +84,6 @@ function validate(values) {
   if (needed.includes('name') && !values.name) return 'Escribe tu nombre o apodo.';
   if (needed.includes('email') && !values.email) return 'Escribe tu correo.';
   if (needed.includes('password') && values.password.length < 6) return 'La contraseña necesita al menos 6 caracteres.';
-  if (needed.includes('code') && !values.code) return 'Escribe el código de invitación.';
   return '';
 }
 
@@ -95,9 +93,9 @@ function messageFor(error) {
   return key ? AUTH_ERRORS[key] : 'No se ha podido completar. Inténtalo de nuevo.';
 }
 
-/** Crea el perfil de miembro. Las reglas solo lo permiten si el código coincide con config/invite. */
-function activateMembership(uid, name, code) {
-  return setDoc(doc(db, 'members', uid), { name, inviteCode: code, createdAt: serverTimestamp() });
+/** Crea el perfil público (nombre visible) del usuario. */
+function createProfile(uid, name) {
+  return setDoc(doc(db, 'members', uid), { name, createdAt: serverTimestamp() });
 }
 
 async function handleSubmit(event) {
@@ -115,16 +113,16 @@ async function handleSubmit(event) {
       registering = true;
       const { user } = await createUserWithEmailAndPassword(auth, values.email, values.password);
       try {
-        await activateMembership(user.uid, values.name, values.code);
+        await createProfile(user.uid, values.name);
       } catch (error) {
-        await deleteUser(user).catch(() => {}); // sin código válido no dejamos cuentas huérfanas
+        await deleteUser(user).catch(() => {}); // si falla el perfil, no dejamos cuentas a medias
         throw error;
       } finally {
         registering = false;
       }
       await resolveUser(user);
     } else {
-      await activateMembership(auth.currentUser.uid, values.name, values.code);
+      await createProfile(auth.currentUser.uid, values.name);
       await resolveUser(auth.currentUser);
     }
   } catch (error) {
@@ -168,7 +166,7 @@ async function resolveUser(user) {
 
   const snapshot = await getDoc(doc(db, 'members', user.uid)).catch(() => null);
   if (!snapshot?.exists()) {
-    // Cuenta creada antes del sistema seguro, o registro a medias: pedimos el código.
+    // Cuenta de la versión anterior (sin perfil): pedimos el nombre una vez.
     setMode('activate');
     screen.hidden = false;
     $('#app').hidden = true;
