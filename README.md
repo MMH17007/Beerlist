@@ -1,5 +1,7 @@
 # beerlist.
 
+**Pruébala:** [beerlist-f02c3.web.app](https://beerlist-f02c3.web.app/)
+
 Diario de cervezas abierto a todo el mundo. Subes la foto de lo que estás bebiendo, le pones nota, ves lo que opinan los demás y montas **mesas** privadas con tus amigos usando un código.
 
 - **Explorar**: muro común con búsqueda y orden (recientes, mejor valoradas, más notas, sin probar).
